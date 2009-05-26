@@ -1,0 +1,64 @@
+ Guides: Deploying with Capistrano feed
+
+It would probably be a good idea to add a special user on your server(s) specifically for deployment. Once created, make sure to generate a public key for that SOB (see Providing Your SSH Key ), and add it to your github account. You may also want to add your personal public key to this new user's ~/.ssh/authorized_keys to ease deployment.
+
+N.B. GitHub doesn’t allow the same public key to be assigned to more than one account. If you would like multiple users to be able to deploy from the same repo you’ll probably want to add the deployer’s public key as a Deploy Key for the repo in question. To do this make sure you’re logged into GitHub as the repo administrator, edit the repo and go to the Admin tab. There you’ll be able to add the deploy key.
+
+Now for the fun part, configuring Capistrano. Here are the 5 most notable Capistrano config options:
+
+default_run_options[:pty] = true
+set :repository,  "git@github.com:vanpelt/rails-app.git"
+set :scm, "git"
+set :scm_passphrase, "p@ssw0rd" #This is your custom users password
+set :user, "deployer"
+
+We need to turn on the :pty option because it would seem we don’t get the passphrase prompt from git if we don’t. Point the :repository option to your github clone URL. Set the :passphrase to the one you generated in the initial step, and set :user to the one you just created.
+
+If you’re using your own private keys for git you might want to tell Capistrano to use agent forwarding with this command
+
+ssh_options[:forward_agent] = true
+
+Set Branch
+
+set :branch, "origin/master"
+
+Or use the following line for newer versions of Capistrano:
+
+set :branch, "master"
+
+This will specify the branch that gets checked out for the deployment.
+
+    Older versions of git (e.g. 1.4.4.2) don’t support -q on git checkout command. This will cause your deployment to fail by default. To fix either upgrade git or do: set :scm_verbose, true 
+
+You may also wish to use one of the following options if your git repo is very large – otherwise each deploy will do a full repository clone every time.
+Remote Cache
+
+set :deploy_via, :remote_cache
+
+Remote caching will keep a local git repo on the server you’re deploying to and simply run a fetch from that rather than an entire clone. This is probably the best option and will only fetch the differences each deploy
+Shallow Clone
+
+set :git_shallow_clone, 1
+
+Shallow cloning will do a clone each time, but will only get the first tree, not all the parents trees, too. This makes it a bit closer to how an svn checkout works, but be careful when using with the set :branch option, because it wont work unless the shallow clone number is big enough to encompass the branch you’ve specified.
+Submodules
+
+set :git_enable_submodules, 1
+
+If you’re using git’s submodule support for edge rails or merb, set this guy to make sure the submodules “git” checked out.
+
+That’s it folks, easy as pie.
+Migrating from SVN
+
+Migrating from SVN-based deploys? Check this thread if you run into any problems.
+Known Hosts List
+
+Note: the first time I tried to deploy, I got a failure, apparently because Capistrano wasn’t prompting with this message:
+
+The authenticity of host 'github.com (65.74.177.129)' can't be established.
+RSA key fingerprint is ....
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'github.com,65.74.177.129' (RSA) to the list of known hosts.
+
+So I opened up a terminal separate from Capistrano and pulled my repo, added github.com to the list of known hosts. My next Cap deploy worked.
+
